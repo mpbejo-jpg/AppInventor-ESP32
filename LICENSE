@@ -1,0 +1,61 @@
+Copyright (c) 2026 Marco Perrone
+
+This repository contains the files for the book "App Inventor & ESP32".
+Different parts are released under different licenses, as described below.
+
+======================================================================
+1. SOURCE CODE - MIT License
+======================================================================
+
+Applies to: Arduino sketches (.ino, .h), Apps Script code (.gs),
+JavaScript and HTML files (.js, .html, package.json), App Inventor
+projects (.aia) and the author's own App Inventor extensions (.aix).
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+======================================================================
+2. EVERYTHING ELSE - Creative Commons Attribution-NonCommercial 4.0
+======================================================================
+
+Applies to: Fritzing diagrams (.fzz) and their images, README files and
+any other non-code content written by the author.
+
+You are free to share and adapt this material for non-commercial purposes,
+as long as you give appropriate credit to the author (Marco Perrone,
+"App Inventor & ESP32"), provide a link to the license and
+indicate if changes were made.
+
+Full license text: https://creativecommons.org/licenses/by-nc/4.0/legalcode
+
+======================================================================
+3. THIRD-PARTY CONTENT
+======================================================================
+
+The following items are NOT covered by the licenses above and remain
+under the terms set by their respective owners:
+
+- App icons in the extra/ folders (and embedded in the .aia projects):
+  icons by Icons8 - https://icons8.com
+- Edge Impulse library (Chapter 20, extra/ei-voicerelay-arduino-*.zip):
+  includes the Edge Impulse SDK, distributed under the licenses contained
+  in the zip file.
+- App Inventor extensions not written by the author, embedded in some
+  .aia projects and not distributed separately in this repository:
+  BluetoothLE (MIT App Inventor) and UrsAI2PahoMQTT (Ullis Roboter Seite).
+  See extensions/README.md for the download links.

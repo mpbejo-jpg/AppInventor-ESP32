@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  html, body { margin: 0; padding: 0; background: #000; overflow: hidden; }
+  canvas { display: block; position: absolute; top: 0; left: 0; }
+</style>
+</head>
+<body>
+<!-- Two layers: static grid behind, sweeping trace in front -->
+<canvas id="grid"></canvas>
+<canvas id="wave"></canvas>
+<script>
+  // --- Settings ---
+  const SAMPLE_RATE   = 25;    // samples per second sent by the ESP32
+  const SWEEP_SECONDS = 5;     // seconds shown on one screen width
+  const GAP_PIXELS    = 12;    // blank gap ahead of the trace (like real monitors)
+  const POLL_MS       = 40;    // how often the WebViewString is checked
+  const TRACE_COLOR   = "#00ff66";
+  const BG_COLOR      = "#000000";
+
+  // --- Grid settings ---
+  const MINOR_TIME_STEP  = 0.2;        // seconds between minor vertical lines
+  const MAJOR_TIME_STEP  = 1.0;        // seconds between major vertical lines
+  const AMPLITUDE_LEVELS = [0, 25, 50, 75, 100]; // horizontal reference lines (no unit: the trace is auto-scaled)
+  const MINOR_COLOR      = "#0b2a16";
+  const MAJOR_COLOR      = "#1d5c33";
+  const LABEL_COLOR      = "#3fa864";
+  const LABEL_FONT       = "11px sans-serif";
+  const LEFT_MARGIN      = 0;          // no vertical labels, trace uses the full width
+  const BOTTOM_MARGIN    = 16;         // space for the time labels
+
+  const gridCanvas = document.getElementById("grid");
+  const gridCtx = gridCanvas.getContext("2d");
+  const canvas = document.getElementById("wave");
+  const ctx = canvas.getContext("2d");
+
+  let plotWidth = 0;     // width of the area where the trace is drawn
+  let plotHeight = 0;    // height of the area where the trace is drawn
+  let step = 1;          // pixels per sample
+  let x = 0;             // current x position of the trace (inside the plot area)
+  let lastY = null;      // previous y, null = start a new segment
+  let lastSeq = "";      // last packet sequence number processed
+  const queue = [];      // samples waiting to be drawn
+
+  function resize() {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    gridCanvas.width = width;
+    gridCanvas.height = height;
+    canvas.width = width;
+    canvas.height = height;
+
+    plotWidth = width - LEFT_MARGIN;
+    plotHeight = height - BOTTOM_MARGIN;
+    step = plotWidth / (SAMPLE_RATE * SWEEP_SECONDS);
+
+    drawGrid();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    x = 0;
+    lastY = null;
+  }
+
+  // Convert a 0..99 value to a y coordinate (10% margin top and bottom)
+  function toY(value) {
+    const margin = plotHeight * 0.1;
+    const usable = plotHeight - 2 * margin;
+    return margin + usable * (1 - value / 99);
+  }
+
+  function drawGrid() {
+    gridCtx.fillStyle = BG_COLOR;
+    gridCtx.fillRect(0, 0, gridCanvas.width, gridCanvas.height);
+    gridCtx.lineWidth = 1;
+    gridCtx.font = LABEL_FONT;
+    gridCtx.fillStyle = LABEL_COLOR;
+
+    // Vertical lines: time
+    const minorCount = Math.round(SWEEP_SECONDS / MINOR_TIME_STEP);
+    const minorPerMajor = Math.round(MAJOR_TIME_STEP / MINOR_TIME_STEP);
+    for (let i = 0; i <= minorCount; i++) {
+      const lineX = LEFT_MARGIN + Math.round(i * plotWidth / minorCount) + 0.5;
+      const isMajor = (i % minorPerMajor === 0);
+      gridCtx.strokeStyle = isMajor ? MAJOR_COLOR : MINOR_COLOR;
+      gridCtx.beginPath();
+      gridCtx.moveTo(lineX, 0);
+      gridCtx.lineTo(lineX, plotHeight);
+      gridCtx.stroke();
+
+      if (isMajor && i > 0) {
+        const seconds = i * MINOR_TIME_STEP;
+        gridCtx.textAlign = (i === minorCount) ? "right" : "center";
+        gridCtx.textBaseline = "top";
+        gridCtx.fillText(seconds.toFixed(0) + " s", lineX, plotHeight + 2);
+      }
+    }
+
+    // Horizontal lines: relative pulse amplitude
+    AMPLITUDE_LEVELS.forEach(level => {
+      const lineY = Math.round(toY(level * 99 / 100)) + 0.5;
+      gridCtx.strokeStyle = MAJOR_COLOR;
+      gridCtx.beginPath();
+      gridCtx.moveTo(LEFT_MARGIN, lineY);
+      gridCtx.lineTo(gridCanvas.width, lineY);
+      gridCtx.stroke();
+    });
+  }
+
+  function drawSample(value) {
+    const px = LEFT_MARGIN + x;
+
+    // Clear the gap ahead of the trace (the grid behind stays visible)
+    ctx.clearRect(px, 0, step + GAP_PIXELS, plotHeight);
+
+    const y = toY(value);
+    if (lastY !== null) {
+      ctx.strokeStyle = TRACE_COLOR;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(px - step, lastY);
+      ctx.lineTo(px, y);
+      ctx.stroke();
+    }
+    lastY = y;
+
+    x += step;
+    if (x > plotWidth) {
+      // Restart the sweep from the left edge
+      x = 0;
+      lastY = null;
+    }
+  }
+
+  // Read new packets from App Inventor. Format: "seq|v1,v2,v3,v4,v5"
+  // "RESET" clears the trace (e.g. finger removed or disconnected)
+  function pollWebViewString() {
+    if (!window.AppInventor) return;
+    const text = window.AppInventor.getWebViewString();
+    if (!text) return;
+
+    if (text === "RESET") {
+      if (lastSeq !== "RESET") {
+        queue.length = 0;
+        resize();
+        lastSeq = "RESET";
+      }
+      return;
+    }
+
+    const parts = text.split("|");
+    if (parts.length !== 2 || parts[0] === lastSeq) return;
+    lastSeq = parts[0];
+
+    parts[1].split(",").forEach(v => {
+      const n = parseInt(v, 10);
+      if (!isNaN(n)) queue.push(n);
+    });
+
+    // Avoid lag if packets pile up
+    while (queue.length > SAMPLE_RATE) queue.shift();
+  }
+
+  // Draw one sample every 1/SAMPLE_RATE seconds for a smooth trace
+  function drawNext() {
+    if (queue.length > 0) drawSample(queue.shift());
+  }
+
+  window.addEventListener("resize", resize);
+  resize();
+  setInterval(pollWebViewString, POLL_MS);
+  setInterval(drawNext, 1000 / SAMPLE_RATE);
+</script>
+</body>
+</html>
